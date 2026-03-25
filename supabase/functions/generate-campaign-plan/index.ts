@@ -1,9 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCorsOptions } from "../_shared/cors.ts";
+import { callGeminiJSON } from "../_shared/gemini-client.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 
 Deno.serve(async (req: Request) => {
   const corsRes = handleCorsOptions(req);
@@ -230,29 +230,16 @@ IMPORTANTE:
 - Foque em ECONOMIA de campanha e MÁXIMO engajamento
 - Formate em Markdown com headers, bullets, tabelas e destaques`;
 
-    // Call Claude API
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 8000,
-        messages: [{ role: "user", content: prompt }],
-      }),
+    // Call Gemini API
+    const result = await callGeminiJSON({
+      model: "gemini-2.5-flash",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 16000,
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Claude API error:", errText);
-      throw new Error(`Claude API error: ${response.status}`);
-    }
-
-    const result = await response.json();
-    const plan = result.content?.[0]?.text || "Erro ao gerar plano";
+    const choices = (result as any).choices || [];
+    const plan = choices[0]?.message?.content || "Erro ao gerar plano";
 
     return new Response(JSON.stringify({
       plan,
